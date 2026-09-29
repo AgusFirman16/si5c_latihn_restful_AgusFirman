@@ -10,19 +10,33 @@ function logger(req, res, next) {
   next(); // wajib, agar request lanjut ke handler berikutnya
 }
 
+function cekApiKey(req, res, next) {
+  const apiKey = req.headers['x-api-key'];
+
+  if (apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ message: 'API key tidak valid' });
+  }
+
+  next();
+}
+
+function errorHttp(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
 // Didaftarkan sebelum route agar mencatat seluruh request
 app.use(logger);
 app.use(cors({
   origin: process.env.CORS_ORIGIN,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
 }));
-
-// Middleware agar req.body (JSON) dapat dibaca
 app.use(express.json());
 
 // POST /mahasiswa
 // Body: { "nama": "Citra", "jurusan": "Sistem Informasi" }
-app.post("/mahasiswa", (req, res) => {
+app.post("/mahasiswa", (req, res, next) => {
   const { nama, jurusan } = req.body;
 
   if (!nama || !jurusan) {
@@ -37,7 +51,7 @@ app.post("/mahasiswa", (req, res) => {
 
 // PUT /mahasiswa/2
 // Body: { "nama": "Budi Santoso", "jurusan": "Informatika" }
-app.put("/mahasiswa/:id", (req, res) => {
+app.put("/mahasiswa/:id", (req, res, next) => {
   const id = parseInt(req.params.id);
   const index = mahasiswa.findIndex((m) => m.id === id);
 
@@ -57,7 +71,7 @@ let mahasiswa = [
 let nextId = 3; // penghitung id untuk data baru
 
 app.get("/", (req, res) => {
-  res.send("Server Express.js berjalan pada PORT 3000! nodemon");
+  res.send("Server Express.js berjalan pada PORT 4000!");
 });
 
 // app.get('/mahasiswa', (req, res) =>  {
@@ -65,19 +79,19 @@ app.get("/", (req, res) => {
 // });
 
 // GET /mahasiswa -> seluruh data, bisa difilter: /mahasiswa?jurusan=Informatika
-app.get("/mahasiswa", (req, res) => {
-  const { jurusan } = req.query;
+app.get("/mahasiswa/:id", (req, res, next) => {
+  const id = parseInt(req.params.id);
+  const data = mahasiswa.find((m) => m.id === id);
 
-  if (jurusan) {
-    const hasil = mahasiswa.filter((m) => m.jurusan === jurusan);
-    return res.json(hasil);
-  }
-
-  res.json(mahasiswa);
+  if (!data) return next(errorHttp(404, "Data tidak ditemukan"));
+  res.json(data);
 });
 
+  
+
+
 // GET /mahasiswa -> seluruh data, bisa difilter: /mahasiswa?jurusan=Informatika
-app.get("/mahasiswa", (req, res) => {
+app.get("/mahasiswa", (req, res, next) => {
   const { jurusan } = req.query;
 
   if (jurusan) {
@@ -89,12 +103,12 @@ app.get("/mahasiswa", (req, res) => {
 });
 
 // DELETE /mahasiswa/2
-app.delete('/mahasiswa/:id', (req, res) => {
+app.delete('/mahasiswa/:id', (req, res, next) => {
   const id = parseInt(req.params.id);
   const index = mahasiswa.findIndex((m) => m.id === id);
 
   if (index === -1) {
-    return res.status(404).json({ message: 'Data tidak ditemukan' });
+    return next(errorHttp(404, 'Data tidak ditemukan'));
   }
 
   mahasiswa.splice(index, 1);
@@ -102,8 +116,8 @@ app.delete('/mahasiswa/:id', (req, res) => {
 });
 
 
-// GET /mahasiswa/:id -> menampilkan satu data berdasarkan id
-app.get("/mahasiswa/:id", (req, res) => {
+// GET /mahasiswa/:id -> menampilkan satu data berdasarkan idm
+app.get("/mahasiswa/:id", (req, res, next) => {
   const id = parseInt(req.params.id);
   const data = mahasiswa.find((m) => m.id === id);
 
