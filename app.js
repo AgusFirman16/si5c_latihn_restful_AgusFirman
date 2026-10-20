@@ -11,7 +11,9 @@ const mahasiswaRoutes = require('./routes/mahasiswaRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const fakultasRoutes = require('./routes/fakultasRoutes');
-// ...
+
+const prodiRoutes = require('./routes/prodiRoutes');   // bersama require lainnya
+
 app.use('/fakultas', fakultasRoutes);
 // ---------- Middleware global ----------
 app.use(logger);
@@ -29,6 +31,7 @@ app.get('/', (req, res) => {
 // ---------- Route per modul ----------
 app.use('/mahasiswa', mahasiswaRoutes);
 app.use('/fakultas', fakultasRoutes);
+app.use('/prodi', prodiRoutes); 
 
 // ---------- Handler 404 dan error handler (paling bawah) ----------
 app.use(notFoundHandler);
