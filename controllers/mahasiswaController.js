@@ -1,42 +1,3 @@
-// const mahasiswaModel = require('../models/mahasiswaModel');
-// const { errorHttp } = require('../middlewares/errorHandler');
-
-// exports.getAll = (req, res) => {
-//   const { jurusan } = req.query;
-//   res.json(mahasiswaModel.getAll(jurusan));
-// };
-
-// exports.getById = (req, res, next) => {
-//   const id = parseInt(req.params.id);
-//   const data = mahasiswaModel.getById(id);
-//   if (!data) return next(errorHttp(404, 'Data tidak ditemukan'));
-//   res.json(data);
-// };
-
-// exports.create = (req, res, next) => {
-//   const { nama, jurusan } = req.body;
-//   if (!nama || !jurusan) return next(errorHttp(400, 'nama dan jurusan wajib diisi'));
-
-//   const baru = mahasiswaModel.create({ nama, jurusan });
-//   res.status(201).json(baru);
-// };
-
-// exports.update = (req, res, next) => {
-//   const id = parseInt(req.params.id);
-//   const hasil = mahasiswaModel.update(id, req.body);
-//   if (!hasil) return next(errorHttp(404, 'Data tidak ditemukan'));
-//   res.json(hasil);
-// };
-
-// exports.remove = (req, res, next) => {
-//   const id = parseInt(req.params.id);
-//   const berhasil = mahasiswaModel.remove(id);
-//   if (!berhasil) return next(errorHttp(404, 'Data tidak ditemukan'));
-//   res.status(204).send();
-// };
-
-
-
 const Mahasiswa = require('../models/mahasiswaModel');
 const Prodi = require('../models/prodiModel');
 const { errorHttp } = require('../middlewares/errorHandler');
@@ -44,6 +5,7 @@ const { errorHttp } = require('../middlewares/errorHandler');
 const LIMIT_DEFAULT = 10;
 const LIMIT_MAKS = 50;
 const FIELD_SORT = ['nama', 'nim', 'createdAt'];
+const FIELD_BOLEH_DIPILIH = ['nama', 'nim', 'alamat', 'prodiId', 'createdAt'];
 
 // Mengubah bilangan dari query string menjadi bilangan bulat yang aman
 function angkaAman(nilai, bawaan, min, maks) {
@@ -82,18 +44,31 @@ exports.getAll = async (req, res) => {
     throw errorHttp(400, `sort hanya boleh: ${FIELD_SORT.join(', ')}`);
   }
 
-  const [data, total] = await Promise.all([
-    Mahasiswa.find(filter)
-      .populate('prodiId', 'kode nama')
-      .sort({ [sortField]: arah, _id: 1 })
-      .skip((page - 1) * limit)
-      .limit(limit),
-    Mahasiswa.countDocuments(filter),
-  ]);
+    // Projection: ?fields=nama,nim
+  let select = '';
+  if (req.query.fields) {
+    const fields = String(req.query.fields).split(',').map((f) => f.trim());
+    if (!fields.every((f) => FIELD_BOLEH_DIPILIH.includes(f))) {
+      throw errorHttp(400, `fields hanya boleh: ${FIELD_BOLEH_DIPILIH.join(', ')}`);
+    }
+    select = fields.join(' ');
+  }
+
+    const query = Mahasiswa.find(filter)
+    .select(select)
+    .sort({ [sortField]: arah, _id: 1 })
+    .skip((page - 1) * limit)
+    .limit(limit);
+
+  // populate() otomatis menambahkan prodiId ke hasil, jadi hanya dipanggil
+  // bila prodiId memang diminta (atau bila tidak ada pemilihan field)
+  if (!select || select.split(' ').includes('prodiId')) {
+    query.populate('prodiId', 'kode nama');
+  }
+
+  const [data, total] = await Promise.all([query, Mahasiswa.countDocuments(filter)]);
   res.json({ data, page, limit, total, totalPages: Math.ceil(total / limit) });
 };
-  
-
 
 exports.getById = async (req, res) => {
   const data = await Mahasiswa.findById(req.params.id).populate('prodiId');
